@@ -1,114 +1,91 @@
 /**
- * Comment API - Individual Comment Operations
- * GET /api/comments/:id - Get comment by ID
- * PUT /api/comments/:id - Update comment
- * DELETE /api/comments/:id - Delete comment
+ * Comment API - Edit and Delete Comment (Story 7.3 & 7.4)
+ * PATCH /api/comments/:id - Update comment (author only, within 15 min edit window)
+ * DELETE /api/comments/:id - Delete own comment (soft delete)
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/lib/auth-middleware'
-import { CommentPermissions } from '@/lib/rbac'
-import { getCommentById, updateComment, deleteComment } from '@/lib/comments'
-import { UserRole } from '@prisma/client'
+import { auth } from '@/lib/auth'
+import { prisma } from '@/lib/db'
 
 /**
- * GET /api/comments/:id
- * Get comment by ID
+ * PATCH /api/comments/:id
+ * Update comment (author only, within 15 minute edit window)
  */
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = await params
-    const session = await getSession()
-
-    const comment = await getCommentById(id)
-
-    if (!comment) {
-      return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
-    }
-
-    // Non-authenticated users can only see approved comments
-    if (!session?.user && comment.status !== 'APPROVED') {
-      return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
-    }
-
-    // Regular users can see their own comments regardless of status
-    const isAuthor = session?.user?.id === comment.authorId
-    const userRoles = (session?.user?.roles || ['USER']) as UserRole[]
-    const canModerate = CommentPermissions.canModerate(userRoles)
-
-    if (comment.status !== 'APPROVED' && !isAuthor && !canModerate) {
-      return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ comment })
-  } catch (error) {
-    console.error('Error getting comment:', error)
-    return NextResponse.json({ error: 'Failed to get comment' }, { status: 500 })
-  }
-}
-
-/**
- * PUT /api/comments/:id
- * Update comment (author only, within edit window)
- */
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  try {
-    const { id } = await params
-    const session = await getSession()
+    const session = await auth()
 
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const comment = await getCommentById(id)
-
-    if (!comment) {
-      return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
-    }
-
-    // Check permissions
-    const userRoles = (session.user.roles || ['USER']) as UserRole[]
-    const canEdit = CommentPermissions.canEdit(userRoles, comment.authorId, session.user.id)
-
-    if (!canEdit) {
-      return NextResponse.json(
-        { error: 'You do not have permission to edit this comment' },
-        { status: 403 }
-      )
-    }
-
+    const { id } = await params
     const body = await req.json()
     const { content } = body
 
     // Validation
-    if (!content) {
+    if (!content || content.trim().length === 0) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 })
     }
 
-    if (content.trim().length < 3) {
+    if (content.trim().length < 1) {
+      return NextResponse.json({ error: 'Content must be at least 1 character' }, { status: 400 })
+    }
+
+    if (content.length > 1000) {
       return NextResponse.json(
-        { error: 'Comment must be at least 3 characters long' },
+        { error: 'Content must be 1000 characters or less' },
         { status: 400 }
       )
     }
 
-    if (content.length > 2000) {
+    // Check comment exists and user owns it
+    const existingComment = await prisma.comment.findUnique({
+      where: { id },
+    })
+
+    if (!existingComment) {
+      return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
+    }
+
+    if (existingComment.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
+    }
+
+    // Check 15 minute edit window
+    const now = new Date()
+    const commentAge = now.getTime() - existingComment.createdAt.getTime()
+    const fifteenMinutes = 15 * 60 * 1000 // 15 minutes in milliseconds
+
+    if (commentAge > fifteenMinutes) {
       return NextResponse.json(
-        { error: 'Comment must be less than 2000 characters' },
-        { status: 400 }
+        { error: 'Edit window expired (15 minutes)' },
+        { status: 403 }
       )
     }
 
-    const updatedComment = await updateComment(id, {
-      content: content.trim(),
-      // Reset to pending if content changed
-      status: content !== comment.content ? 'PENDING' : comment.status,
+    // Update comment
+    const updatedComment = await prisma.comment.update({
+      where: { id },
+      data: {
+        content: content.trim(),
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true,
+          },
+        },
+      },
     })
 
-    return NextResponse.json({
-      message: 'Comment updated successfully',
-      comment: updatedComment,
-    })
+    return NextResponse.json(updatedComment)
   } catch (error) {
     console.error('Error updating comment:', error)
     return NextResponse.json({ error: 'Failed to update comment' }, { status: 500 })
@@ -117,39 +94,50 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
 /**
  * DELETE /api/comments/:id
- * Delete comment (author or moderator)
+ * Delete own comment (soft delete)
  */
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const { id } = await params
-    const session = await getSession()
+    const session = await auth()
 
     if (!session?.user) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    const comment = await getCommentById(id)
+    const { id } = await params
+
+    // Check comment exists
+    const comment = await prisma.comment.findUnique({
+      where: { id },
+    })
 
     if (!comment) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 })
     }
 
-    // Check permissions
-    const userRoles = (session.user.roles || ['USER']) as UserRole[]
-    const canDelete = CommentPermissions.canDelete(userRoles, comment.authorId, session.user.id)
-
-    if (!canDelete) {
-      return NextResponse.json(
-        { error: 'You do not have permission to delete this comment' },
-        { status: 403 }
-      )
+    // Check if user owns the comment
+    if (comment.userId !== session.user.id) {
+      return NextResponse.json({ error: 'Permission denied' }, { status: 403 })
     }
 
-    await deleteComment(id)
+    // Check if already deleted
+    if (comment.deletedAt) {
+      return NextResponse.json({ error: 'Comment already deleted' }, { status: 400 })
+    }
 
-    return NextResponse.json({
-      message: 'Comment deleted successfully',
+    // Soft delete the comment
+    await prisma.comment.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+        deletedBy: session.user.id,
+      },
     })
+
+    return NextResponse.json({ success: true, message: 'Comment deleted successfully' })
   } catch (error) {
     console.error('Error deleting comment:', error)
     return NextResponse.json({ error: 'Failed to delete comment' }, { status: 500 })

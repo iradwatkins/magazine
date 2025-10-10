@@ -1,65 +1,158 @@
+import { prisma } from '@/lib/db'
+import { ArticleCard } from '@/components/articles/article-card'
+import { FeaturedArticle } from '@/components/articles/featured-article'
+import { SiteHeader } from '@/components/layout/site-header'
+import { SiteFooter } from '@/components/layout/site-footer'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
+import Link from 'next/link'
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Fetch published articles
+  const articles = await prisma.article.findMany({
+    where: { status: 'PUBLISHED' },
+    include: {
+      author: {
+        select: {
+          id: true,
+          name: true,
+          image: true,
+        },
+      },
+    },
+    orderBy: { publishedAt: 'desc' },
+    take: 10,
+  })
+
+  const [featuredArticle, ...latestArticles] = articles
+
+  // Group articles by category for category sections
+  const articlesByCategory = latestArticles.reduce((acc, article) => {
+    const category = article.category
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    if (acc[category].length < 3) {
+      acc[category].push(article)
+    }
+    return acc
+  }, {} as Record<string, typeof latestArticles>)
+
   return (
-    <main className="via-muted/20 flex min-h-screen items-center justify-center bg-gradient-to-br from-background to-background p-4">
-      <div className="w-full max-w-4xl">
-        <Card className="border-2 shadow-2xl">
-          <CardContent className="p-12 text-center">
-            {/* Header */}
-            <div className="mb-8">
-              <div className="mb-4 inline-block">
-                <Badge className="gold-gradient px-4 py-1 text-sm font-bold text-black">
-                  SteppersLife Property
-                </Badge>
-              </div>
-              <h1 className="gold-text-gradient mb-4 text-5xl font-bold">Magazine</h1>
-              <p className="mb-2 text-xl text-muted-foreground">
-                Your premier digital magazine for stepping culture and lifestyle
-              </p>
+    <>
+      <SiteHeader />
+      <main className="min-h-screen bg-background">
+      {/* Hero/Featured Article Section */}
+      {featuredArticle ? (
+        <FeaturedArticle article={featuredArticle} />
+      ) : (
+        <section className="container mx-auto px-4 py-12 text-center">
+          <div className="space-y-4">
+            <Badge className="bg-gold px-4 py-1 text-sm font-bold text-black">
+              SteppersLife Property
+            </Badge>
+            <h1 className="text-5xl font-bold">Magazine</h1>
+            <p className="text-xl text-muted-foreground">
+              Your premier digital magazine for stepping culture and lifestyle
+            </p>
+            <div className="pt-6">
+              <Link href="/sign-in">
+                <Button size="lg" className="bg-gold font-bold text-black hover:bg-gold/90">
+                  Sign In to Create Content
+                </Button>
+              </Link>
             </div>
+          </div>
+        </section>
+      )}
 
-            {/* Coming Soon */}
-            <div className="my-12">
-              <p className="mb-2 text-3xl font-bold">Coming Soon!</p>
-              <p className="text-muted-foreground">
-                We&apos;re building something special for the stepping community
-              </p>
-            </div>
+      {/* Latest Articles Grid */}
+      {latestArticles.length > 0 && (
+        <section className="container mx-auto px-4 py-12 lg:py-16">
+          <div className="mb-8 flex items-center justify-between">
+            <h2 className="text-3xl font-bold lg:text-4xl">Latest Articles</h2>
+            <Link href="/articles">
+              <Button variant="outline">View All</Button>
+            </Link>
+          </div>
 
-            {/* Features Grid */}
-            <div className="mt-12 grid grid-cols-1 gap-6 text-left md:grid-cols-3">
-              <div className="space-y-2">
-                <div className="font-semibold text-gold">📰 Articles</div>
-                <p className="text-sm text-muted-foreground">
-                  Curated stories and news from the stepping world
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="font-semibold text-gold">📸 Media</div>
-                <p className="text-sm text-muted-foreground">
-                  Photos, videos, and coverage of events
-                </p>
-              </div>
-              <div className="space-y-2">
-                <div className="font-semibold text-gold">🎉 Community</div>
-                <p className="text-sm text-muted-foreground">
-                  Connect with steppers across the nation
-                </p>
-              </div>
-            </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {latestArticles.slice(0, 6).map((article) => (
+              <ArticleCard key={article.id} article={article} />
+            ))}
+          </div>
 
-            {/* Footer */}
-            <div className="mt-12 border-t pt-8">
-              <p className="text-sm text-muted-foreground">magazine.stepperslife.com · Port 3007</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Part of the SteppersLife ecosystem
-              </p>
+          {latestArticles.length > 6 && (
+            <div className="mt-8 text-center">
+              <Link href="/articles">
+                <Button size="lg" variant="outline">
+                  View All Articles
+                </Button>
+              </Link>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-    </main>
+          )}
+        </section>
+      )}
+
+      {/* Category Sections (Optional) */}
+      {Object.keys(articlesByCategory).length > 0 && (
+        <section className="bg-muted/30 py-12 lg:py-16">
+          <div className="container mx-auto px-4">
+            <h2 className="mb-8 text-3xl font-bold lg:text-4xl">
+              Browse by Category
+            </h2>
+
+            <div className="space-y-12">
+              {Object.entries(articlesByCategory)
+                .slice(0, 3)
+                .map(([category, categoryArticles]) => (
+                  <div key={category}>
+                    <div className="mb-6 flex items-center justify-between">
+                      <h3 className="text-2xl font-bold capitalize">
+                        {category.toLowerCase().replace('_', ' ')}
+                      </h3>
+                      <Link href={`/articles?category=${category}`}>
+                        <Button variant="ghost" size="sm">
+                          View All
+                        </Button>
+                      </Link>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                      {categoryArticles.map((article) => (
+                        <ArticleCard key={article.id} article={article} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Empty State */}
+      {articles.length === 0 && (
+        <section className="container mx-auto px-4 py-20 text-center">
+          <div className="mx-auto max-w-2xl space-y-6">
+            <div className="text-6xl">📰</div>
+            <h2 className="text-3xl font-bold">No Published Articles Yet</h2>
+            <p className="text-lg text-muted-foreground">
+              Articles will appear here once they are published. Sign in to create
+              and publish content.
+            </p>
+            <div className="pt-4">
+              <Link href="/sign-in">
+                <Button size="lg" className="bg-gold font-bold text-black hover:bg-gold/90">
+                  Get Started
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      </main>
+      <SiteFooter />
+    </>
   )
 }

@@ -55,14 +55,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = user.id
 
-        // Get user roles from database
+        // Get user role from database
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { roles: true },
+          select: { role: true },
         })
 
-        // @ts-expect-error - Adding custom roles field
-        session.user.roles = dbUser?.roles || ['USER']
+        // @ts-expect-error - Adding custom role field
+        session.user.role = dbUser?.role || 'USER'
       }
       return session
     },

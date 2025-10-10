@@ -8,6 +8,20 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  webpack: (config, { isServer }) => {
+    // Fix for nodemailer in client-side builds
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        dns: false,
+        tls: false,
+        child_process: false,
+      }
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig

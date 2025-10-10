@@ -28,15 +28,32 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import SaveStatusIndicator from './save-status-indicator'
 import KeyboardShortcutsModal from './keyboard-shortcuts-modal'
+import { ArticleSettingsForm } from './article-settings-form'
 import { SaveStatus } from '@/hooks/useAutoSave'
 import { useEditorStore } from '@/lib/stores/editor-store'
-import { Undo, Redo, Eye, Upload, HelpCircle } from 'lucide-react'
+import { Undo, Redo, Eye, Upload, HelpCircle, Settings } from 'lucide-react'
 
 interface Article {
   id: string
   title: string
+  slug: string
+  excerpt?: string | null
+  category: string
+  tags: string[]
+  featuredImage?: string | null
+  metaTitle?: string | null
+  metaDescription?: string | null
+  status: string
+  isFeatured: boolean
 }
 
 interface EditorToolbarProps {
@@ -61,10 +78,16 @@ interface EditorToolbarProps {
   onSave: () => void
 }
 
-export default function EditorToolbar({ article, saveStatus, lastSaved, onSave }: EditorToolbarProps) {
+export default function EditorToolbar({
+  article,
+  saveStatus,
+  lastSaved,
+  onSave,
+}: EditorToolbarProps) {
   const { undo, redo, canUndo, canRedo } = useEditorStore()
   const [title, setTitle] = useState(article.title)
   const [showHelp, setShowHelp] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const handleTitleUpdate = async () => {
     if (title === article.title) return
@@ -122,7 +145,20 @@ export default function EditorToolbar({ article, saveStatus, lastSaved, onSave }
 
           {/* Actions */}
           <div className="flex items-center gap-2 border-l pl-4">
-            <Button variant="outline" size="sm" disabled title="Preview (Coming Soon)">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowSettings(true)}
+              title="Article Settings"
+            >
+              <Settings className="mr-2 h-4 w-4" /> Settings
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.open(`/preview/${article.id}`, '_blank')}
+              title="Preview Article"
+            >
               <Eye className="mr-2 h-4 w-4" /> Preview
             </Button>
             <Button variant="default" size="sm" disabled title="Publish (Coming Soon)">
@@ -141,6 +177,19 @@ export default function EditorToolbar({ article, saveStatus, lastSaved, onSave }
       </header>
 
       <KeyboardShortcutsModal open={showHelp} onOpenChange={setShowHelp} />
+
+      {/* Article Settings Dialog */}
+      <Dialog open={showSettings} onOpenChange={setShowSettings}>
+        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Article Settings</DialogTitle>
+            <DialogDescription>
+              Manage article metadata, categorization, SEO settings, and more
+            </DialogDescription>
+          </DialogHeader>
+          <ArticleSettingsForm article={article} onClose={() => setShowSettings(false)} />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

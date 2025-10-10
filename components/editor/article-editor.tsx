@@ -27,7 +27,16 @@ import InspectorPanel from './inspector-panel'
 interface Article {
   id: string
   title: string
-  blocks: string | null // JSON string
+  content: string // JSON string (blocks data)
+  slug: string
+  excerpt?: string | null
+  category: string
+  tags: string[]
+  featuredImage?: string | null
+  metaTitle?: string | null
+  metaDescription?: string | null
+  status: string
+  isFeatured: boolean
 }
 
 interface ArticleEditorProps {
@@ -39,8 +48,8 @@ export default function ArticleEditor({ article }: ArticleEditorProps) {
 
   // Initialize store with article blocks
   useEffect(() => {
-    // Parse blocks from JSON
-    const initialBlocks: AnyBlock[] = article.blocks ? JSON.parse(article.blocks) : []
+    // Parse blocks from JSON content
+    const initialBlocks: AnyBlock[] = article.content ? JSON.parse(article.content) : []
 
     // Load blocks into store
     initialBlocks.forEach((block) => {
@@ -49,7 +58,7 @@ export default function ArticleEditor({ article }: ArticleEditorProps) {
 
     // Save initial state to history
     saveToHistory()
-  }, [article.blocks, addBlock, saveToHistory])
+  }, [article.content, addBlock, saveToHistory])
 
   // Auto-save setup
   const { saveStatus, lastSaved, triggerSave } = useAutoSave({

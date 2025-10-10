@@ -5,9 +5,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { withAnyRole, getSession } from '@/lib/auth-middleware'
+import { getSession } from '@/lib/auth-middleware'
 import { listArticles, createArticle, generateUniqueSlug } from '@/lib/articles'
-import { ArticleStatus, ArticleCategory } from '@prisma/client'
+import { ArticleStatus, ArticleCategory, UserRole } from '@prisma/client'
 
 /**
  * GET /api/articles
@@ -55,63 +55,79 @@ export async function GET(req: NextRequest) {
  * POST /api/articles
  * Create a new article (writer+ only)
  */
-export const POST = withAnyRole(
-  ['MAGAZINE_WRITER', 'MAGAZINE_EDITOR', 'ADMIN'],
-  async (req, session) => {
-    try {
-      const body = await req.json()
-      const { title, content, excerpt, category, featuredImageUrl, tags } = body
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getSession()
 
-      // Validation
-      if (!title || !content || !category) {
-        return NextResponse.json(
-          { error: 'Title, content, and category are required' },
-          { status: 400 }
-        )
-      }
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
+    }
 
-      // Validate category
-      const validCategories: ArticleCategory[] = [
-        'NEWS',
-        'CULTURE',
-        'EVENTS',
-        'INTERVIEWS',
-        'TUTORIALS',
-        'COMMUNITY',
-        'OPINION',
-      ]
-      if (!validCategories.includes(category)) {
-        return NextResponse.json(
-          { error: `Invalid category. Must be one of: ${validCategories.join(', ')}` },
-          { status: 400 }
-        )
-      }
+    // SSO provides single role, convert to array for RBAC functions
+    const userRole = (session.user as any)?.role || 'USER'
+    const userRoles = [userRole] as UserRole[]
 
-      // Generate unique slug from title
-      const slug = await generateUniqueSlug(title)
+    // Check if user has writer permissions
+    const hasWriterPermission = userRoles.some((role) =>
+      ['MAGAZINE_WRITER', 'MAGAZINE_EDITOR', 'ADMIN'].includes(role)
+    )
 
-      const article = await createArticle({
-        title,
-        slug,
-        content,
-        excerpt,
-        category,
-        authorId: session.user.id,
-        featuredImageUrl,
-        tags: tags || [],
-        status: 'DRAFT',
-      })
-
+    if (!hasWriterPermission) {
       return NextResponse.json(
-        { message: 'Article created successfully', article },
-        { status: 201 }
-      )
-    } catch (error) {
-      console.error('Error creating article:', error)
-      return NextResponse.json(
-        { error: error instanceof Error ? error.message : 'Failed to create article' },
-        { status: 500 }
+        { error: 'You need writer permissions to create articles' },
+        { status: 403 }
       )
     }
+
+    const body = await req.json()
+    const { title, content, excerpt, category, featuredImageUrl, tags } = body
+
+    // Validation
+    if (!title || !category) {
+      return NextResponse.json({ error: 'Title and category are required' }, { status: 400 })
+    }
+
+    // Validate category
+    const validCategories: ArticleCategory[] = [
+      'NEWS',
+      'EVENTS',
+      'INTERVIEWS',
+      'HISTORY',
+      'TUTORIALS',
+      'LIFESTYLE',
+      'FASHION',
+      'MUSIC',
+      'COMMUNITY',
+      'OTHER',
+    ]
+    if (!validCategories.includes(category)) {
+      return NextResponse.json(
+        { error: `Invalid category. Must be one of: ${validCategories.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Generate unique slug from title
+    const slug = await generateUniqueSlug(title)
+
+    const article = await createArticle({
+      title,
+      slug,
+      content: content || JSON.stringify([]),
+      excerpt: excerpt || '',
+      category,
+      authorId: session.user.id,
+      featuredImageUrl,
+      tags: tags || [],
+      status: 'DRAFT',
+    })
+
+    return NextResponse.json({ message: 'Article created successfully', article }, { status: 201 })
+  } catch (error) {
+    console.error('Error creating article:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to create article' },
+      { status: 500 }
+    )
   }
-)
+}

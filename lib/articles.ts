@@ -108,7 +108,7 @@ export async function getArticleById(id: string) {
           name: true,
           email: true,
           image: true,
-          roles: true,
+          role: true,
         },
       },
       reviewer: {
@@ -119,11 +119,11 @@ export async function getArticleById(id: string) {
         },
       },
       comments: {
-        where: { status: 'APPROVED' },
+        where: { isApproved: true },
         orderBy: { createdAt: 'desc' },
         take: 5,
         include: {
-          author: {
+          user: {
             select: {
               id: true,
               name: true,
@@ -139,9 +139,10 @@ export async function getArticleById(id: string) {
 }
 
 /**
- * Get article by slug
+ * Get article by slug (without incrementing view count)
+ * Use this for metadata generation or preview
  */
-export async function getArticleBySlug(slug: string) {
+export async function getArticleBySlug(slug: string, incrementView: boolean = false) {
   const article = await prisma.article.findUnique({
     where: { slug },
     include: {
@@ -151,7 +152,7 @@ export async function getArticleBySlug(slug: string) {
           name: true,
           email: true,
           image: true,
-          roles: true,
+          role: true,
         },
       },
       reviewer: {
@@ -164,8 +165,8 @@ export async function getArticleBySlug(slug: string) {
     },
   })
 
-  // Increment view count
-  if (article) {
+  // Optionally increment view count (only when rendering full page)
+  if (article && incrementView) {
     await prisma.article.update({
       where: { id: article.id },
       data: { viewCount: { increment: 1 } },
@@ -176,12 +177,25 @@ export async function getArticleBySlug(slug: string) {
 }
 
 /**
+ * Increment article view count
+ * Should be called client-side after page load
+ */
+export async function incrementArticleView(articleId: string) {
+  await prisma.article.update({
+    where: { id: articleId },
+    data: { viewCount: { increment: 1 } },
+  })
+}
+
+/**
  * List articles with filters and pagination
  */
 export async function listArticles(
   filters: ArticleFilters = {},
   page: number = 1,
-  limit: number = 20
+  limit: number = 20,
+  sortBy: string = 'updatedAt',
+  sortOrder: 'asc' | 'desc' = 'desc'
 ) {
   const where: Prisma.ArticleWhereInput = {}
 
@@ -211,10 +225,18 @@ export async function listArticles(
     ]
   }
 
+  // Build orderBy based on sortBy parameter
+  let orderBy: any = { [sortBy]: sortOrder }
+
+  // Special handling for author sorting (nested relation)
+  if (sortBy === 'author') {
+    orderBy = { author: { name: sortOrder } }
+  }
+
   const [articles, total] = await Promise.all([
     prisma.article.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip: (page - 1) * limit,
       take: limit,
       include: {
@@ -501,7 +523,7 @@ export async function generateUniqueSlug(title: string): Promise<string> {
 }
 
 /**
- * Update article blocks
+ * Update article blocks (content)
  *
  * @param articleId - Article ID
  * @param blocks - Array of blocks to save
@@ -510,8 +532,106 @@ export async function updateArticleBlocks(articleId: string, blocks: any[]) {
   await prisma.article.update({
     where: { id: articleId },
     data: {
-      blocks: JSON.stringify(blocks),
+      content: JSON.stringify(blocks),
       updatedAt: new Date(),
     },
   })
+}
+
+/**
+ * Get article for editing (alias for getArticleById)
+ */
+export async function getArticle(id: string) {
+  return getArticleById(id)
+}
+
+/**
+ * Get approved comments for an article (Story 7.2 + 7.4)
+ * Returns only approved, non-deleted comments, ordered by creation date (newest first)
+ */
+export async function getArticleComments(articleId: string) {
+  const comments = await prisma.comment.findMany({
+    where: {
+      articleId,
+      isApproved: true,
+      deletedAt: null, // Exclude soft-deleted comments
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      id: true,
+      content: true,
+      userName: true,
+      userPhoto: true,
+      createdAt: true,
+      updatedAt: true,
+      parentId: true,
+      userId: true,
+      deletedAt: true, // Include for frontend display logic
+    },
+  })
+
+  return comments
+}
+
+/**
+ * Get related articles (Story 7.7)
+ * Algorithm:
+ * 1. Same category + matching tags (ranked by tag overlap)
+ * 2. Fallback to same category if no tag matches
+ * Returns 3-4 related articles, excludes current article
+ */
+export async function getRelatedArticles(
+  currentArticleId: string,
+  category: string,
+  tags: string[],
+  limit: number = 4
+) {
+  // Get all published articles in same category (excluding current article)
+  const candidates = await prisma.article.findMany({
+    where: {
+      id: { not: currentArticleId },
+      category,
+      status: 'PUBLISHED',
+    },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      featuredImage: true,
+      category: true,
+      tags: true,
+      authorName: true,
+      authorPhoto: true,
+      publishedAt: true,
+      viewCount: true,
+      likeCount: true,
+    },
+    take: 20, // Get more candidates for better matching
+  })
+
+  // Score articles by tag overlap
+  const scoredArticles = candidates.map((article) => {
+    const tagOverlap = article.tags.filter((tag) => tags.includes(tag)).length
+    return {
+      ...article,
+      score: tagOverlap,
+    }
+  })
+
+  // Sort by score (tag overlap) descending, then by publishedAt descending
+  const sorted = scoredArticles.sort((a, b) => {
+    if (b.score !== a.score) {
+      return b.score - a.score
+    }
+    // If same score, prefer newer articles
+    const aDate = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+    const bDate = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+    return bDate - aDate
+  })
+
+  // Return top N articles
+  return sorted.slice(0, limit)
 }

@@ -20,6 +20,7 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 ## 🎯 Acceptance Criteria
 
 ### 1. Editor Page Route
+
 - [ ] Page accessible at `/articles/{id}/edit`
 - [ ] Server-side article loading from database
 - [ ] User authentication required (redirect to sign-in if not authenticated)
@@ -27,6 +28,7 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 - [ ] Article not found redirects to articles list
 
 ### 2. Component Integration
+
 - [ ] EditorCanvas (center) - drag-drop blocks with reordering
 - [ ] BlockPalette (left sidebar) - all 6 block types available
 - [ ] InspectorPanel (right sidebar) - shows settings for selected block
@@ -34,6 +36,7 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 - [ ] All components properly communicate via Zustand store
 
 ### 3. Auto-Save Integration
+
 - [ ] Auto-save triggers every 30 seconds when idle
 - [ ] Pauses while user is typing (3-second idle detection)
 - [ ] Save status indicator shows: idle/saving/saved/error
@@ -41,6 +44,7 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 - [ ] Changes persist to database via API endpoint
 
 ### 4. Keyboard Shortcuts
+
 - [ ] `Cmd/Ctrl + Z` → Undo last action
 - [ ] `Cmd/Ctrl + Shift + Z` → Redo last action
 - [ ] `Cmd/Ctrl + S` → Manual save (prevents browser default)
@@ -48,6 +52,7 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 - [ ] Toast notifications confirm actions
 
 ### 5. Editor Toolbar
+
 - [ ] Article title input (editable, saves on blur)
 - [ ] Undo button (disabled when canUndo() is false)
 - [ ] Redo button (disabled when canRedo() is false)
@@ -57,6 +62,7 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 - [ ] Help button (opens keyboard shortcuts modal)
 
 ### 6. History Management
+
 - [ ] `saveToHistory()` called after `addBlock()`
 - [ ] `saveToHistory()` called after `updateBlock()`
 - [ ] `saveToHistory()` called after `deleteBlock()`
@@ -65,12 +71,14 @@ So that I can **create and edit articles with drag-and-drop blocks, auto-save, u
 - [ ] Deep cloning prevents reference mutations
 
 ### 7. Data Persistence
+
 - [ ] Article blocks loaded from database on page mount
 - [ ] Blocks saved as JSON string via PUT `/api/articles/{id}/blocks`
 - [ ] Page refresh loads previously saved blocks
 - [ ] Error handling shows retry option on save failure
 
 ### 8. Help Modal
+
 - [ ] Modal shows all keyboard shortcuts
 - [ ] Platform-specific modifier keys (Cmd on Mac, Ctrl on Windows)
 - [ ] Opens via help button or `?` key
@@ -161,17 +169,20 @@ const {
 ## 📁 Files to Create
 
 ### 1. Article Editor Page
+
 **Path:** `app/articles/[id]/edit/page.tsx`
 
 **Purpose:** Server component that loads article data and renders client editor
 
 **Dependencies:**
+
 - `@/lib/articles` - getArticle()
 - `@/lib/auth` - getServerSession()
 - `next-auth` - Authentication
 - `next/navigation` - redirect()
 
 **Key Functions:**
+
 - Load article from database
 - Check authentication
 - Validate user permissions
@@ -180,17 +191,20 @@ const {
 ---
 
 ### 2. Article Editor Client Component
+
 **Path:** `components/editor/article-editor.tsx`
 
 **Purpose:** Main client component that integrates all editor components
 
 **Dependencies:**
+
 - `@/lib/stores/editor-store` - Zustand store
 - `@/hooks/useAutoSave` - Auto-save hook
 - `@/hooks/useEditorKeyboardShortcuts` - Keyboard shortcuts
 - All editor components (Canvas, Palette, Inspector, Toolbar)
 
 **Key Functions:**
+
 - Initialize store with article blocks
 - Set up auto-save with API endpoint
 - Register keyboard shortcuts
@@ -199,11 +213,13 @@ const {
 ---
 
 ### 3. Editor Toolbar
+
 **Path:** `components/editor/editor-toolbar.tsx`
 
 **Purpose:** Top toolbar with title, undo/redo, save status, and actions
 
 **Dependencies:**
+
 - `@/components/ui/button` - Button components
 - `@/components/ui/input` - Title input
 - `@/hooks/useAutoSave` - SaveStatus type
@@ -211,6 +227,7 @@ const {
 - `lucide-react` - Icons
 
 **Key Functions:**
+
 - Article title editing with blur save
 - Undo/Redo button management
 - Action button handlers (Preview, Publish, Help)
@@ -219,15 +236,18 @@ const {
 ---
 
 ### 4. Keyboard Shortcuts Hook
+
 **Path:** `hooks/useEditorKeyboardShortcuts.ts`
 
 **Purpose:** Register global keyboard shortcuts for editor
 
 **Dependencies:**
+
 - `@/lib/stores/editor-store` - undo/redo
 - `@/hooks/use-toast` - Toast notifications
 
 **Key Functions:**
+
 - Detect Cmd (Mac) vs Ctrl (Windows/Linux)
 - Ignore shortcuts when typing in inputs
 - Handle Undo (Cmd/Ctrl+Z)
@@ -237,14 +257,17 @@ const {
 ---
 
 ### 5. Keyboard Shortcuts Modal
+
 **Path:** `components/editor/keyboard-shortcuts-modal.tsx`
 
 **Purpose:** Help modal showing all available keyboard shortcuts
 
 **Dependencies:**
+
 - `@/components/ui/dialog` - Modal component
 
 **Key Functions:**
+
 - Display keyboard shortcuts list
 - Platform detection (Mac vs Windows)
 - Responsive modal layout
@@ -252,16 +275,19 @@ const {
 ---
 
 ### 6. API Endpoint - Update Blocks
+
 **Path:** `app/api/articles/[id]/blocks/route.ts`
 
 **Purpose:** Save article blocks to database
 
 **Dependencies:**
+
 - `next-auth` - Authentication
 - `@/lib/articles` - updateArticleBlocks()
 - `@/types/blocks` - AnyBlock type
 
 **Key Functions:**
+
 - Validate authentication
 - Check user permissions
 - Save blocks JSON to database
@@ -270,14 +296,17 @@ const {
 ---
 
 ### 7. Database Function
+
 **Path:** `lib/articles.ts` (add function)
 
 **Purpose:** Update article blocks in database
 
 **Dependencies:**
+
 - Prisma client
 
 **Key Functions:**
+
 - Update article.blocks column
 - Update article.updatedAt timestamp
 
@@ -288,6 +317,7 @@ const {
 ### Manual Testing
 
 #### Happy Path
+
 1. Navigate to `/articles/{existing-id}/edit`
 2. Verify article title and blocks load
 3. Edit article title → blur → verify API call
@@ -303,6 +333,7 @@ const {
 13. Check database → verify blocks JSON saved
 
 #### Error Scenarios
+
 1. Navigate to `/articles/invalid-id/edit` → verify redirects
 2. Not authenticated → verify redirects to sign-in
 3. No permission → verify redirects to articles list
@@ -310,6 +341,7 @@ const {
 5. Network offline → verify error handling
 
 #### Keyboard Shortcuts
+
 1. Make change → Cmd/Ctrl+Z → verify undo + toast
 2. Cmd/Ctrl+Shift+Z → verify redo + toast
 3. Cmd/Ctrl+S → verify save + toast
@@ -317,6 +349,7 @@ const {
 5. Press Esc → verify modal closes
 
 #### Responsive Design
+
 1. Desktop (>1024px) → verify all sidebars visible
 2. Tablet (768-1024px) → verify responsive layout
 3. Mobile (<768px) → verify sidebars collapse
@@ -352,6 +385,7 @@ test('complete editor workflow', async ({ page }) => {
 ## 📦 Dependencies
 
 ### Existing (Already Installed)
+
 - `zustand` - State management
 - `@dnd-kit/*` - Drag and drop
 - `date-fns` - Date formatting
@@ -359,6 +393,7 @@ test('complete editor workflow', async ({ page }) => {
 - `@prisma/client` - Database
 
 ### New (Need to Add)
+
 - `@radix-ui/react-dialog` - Modal (via shadcn toast)
   ```bash
   npx shadcn@latest add toast
@@ -370,11 +405,13 @@ test('complete editor workflow', async ({ page }) => {
 ## 🚀 Implementation Steps
 
 ### Phase 1: Setup (30 min)
+
 1. ✅ Create story documentation (this file)
 2. ⏳ Add toast and dialog components
 3. ⏳ Create all 7 files from templates
 
 ### Phase 2: Core Integration (2 hours)
+
 1. ⏳ Implement article editor page (server component)
 2. ⏳ Implement article editor client component
 3. ⏳ Implement editor toolbar
@@ -382,23 +419,27 @@ test('complete editor workflow', async ({ page }) => {
 5. ⏳ Add history saving to store actions
 
 ### Phase 3: Keyboard Shortcuts (1 hour)
+
 1. ⏳ Implement keyboard shortcuts hook
 2. ⏳ Implement keyboard shortcuts modal
 3. ⏳ Add toast notifications
 4. ⏳ Test platform detection (Mac/Windows)
 
 ### Phase 4: API & Database (30 min)
+
 1. ⏳ Implement blocks API endpoint
 2. ⏳ Add updateArticleBlocks function
 3. ⏳ Test save/load flow
 
 ### Phase 5: Testing & QA (1 hour)
+
 1. ⏳ Manual testing of all acceptance criteria
 2. ⏳ Error scenario testing
 3. ⏳ Responsive design testing
 4. ⏳ Cross-browser testing
 
 ### Phase 6: Documentation (30 min)
+
 1. ⏳ Create QA report
 2. ⏳ Update handoff document
 3. ⏳ Mark story as complete
@@ -424,12 +465,14 @@ test('complete editor workflow', async ({ page }) => {
 ## 📝 Notes
 
 ### Known Limitations
+
 - Preview and Publish buttons are placeholders (implementation in future stories)
 - No real-time collaboration (single user editing)
 - No revision history beyond 50 undo snapshots
 - No rich text formatting in paragraphs yet
 
 ### Future Enhancements
+
 - Implement Preview modal (Story 6.x)
 - Implement Publish workflow (Story 6.x)
 - Add rich text editor to ParagraphBlock

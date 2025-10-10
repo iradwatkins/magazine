@@ -45,9 +45,7 @@ export function useEditorKeyboardShortcuts({ onSave }: UseEditorKeyboardShortcut
       // EXCEPT for Cmd/Ctrl+Z which should work everywhere
       const target = e.target as HTMLElement
       const isEditing =
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
+        target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
 
       // Cmd/Ctrl + Z (Undo)
       if (modifier && e.key === 'z' && !e.shiftKey) {

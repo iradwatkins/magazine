@@ -45,7 +45,10 @@ interface Shortcut {
   action: string
 }
 
-export default function KeyboardShortcutsModal({ open, onOpenChange }: KeyboardShortcutsModalProps) {
+export default function KeyboardShortcutsModal({
+  open,
+  onOpenChange,
+}: KeyboardShortcutsModalProps) {
   const [isMac, setIsMac] = useState(false)
 
   // Detect platform on mount
