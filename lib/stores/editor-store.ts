@@ -172,22 +172,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setPanelCollapsed: (collapsed: boolean) => set({ isPanelCollapsed: collapsed }),
 
-  addBlock: (block: AnyBlock) =>
+  addBlock: (block: AnyBlock) => {
     set((state) => ({
       blocks: [...state.blocks, block].map((b, i) => ({ ...b, order: i })),
-    })),
+    }))
+    get().saveToHistory()
+  },
 
-  updateBlockOrder: (blocks: AnyBlock[]) => set({ blocks }),
+  updateBlockOrder: (blocks: AnyBlock[]) => {
+    set({ blocks })
+    get().saveToHistory()
+  },
 
-  deleteBlock: (id: string) =>
+  deleteBlock: (id: string) => {
     set((state) => ({
       blocks: state.blocks.filter((b) => b.id !== id).map((b, i) => ({ ...b, order: i })),
-    })),
+    }))
+    get().saveToHistory()
+  },
 
-  updateBlock: (id: string, data: Partial<AnyBlock['data']>) =>
+  updateBlock: (id: string, data: Partial<AnyBlock['data']>) => {
     set((state) => ({
       blocks: state.blocks.map((b) => (b.id === id ? { ...b, data: { ...b.data, ...data } } : b)),
-    })),
+    }))
+    get().saveToHistory()
+  },
 
   saveToHistory: () =>
     set((state) => {

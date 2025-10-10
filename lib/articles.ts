@@ -499,3 +499,19 @@ export async function generateUniqueSlug(title: string): Promise<string> {
     counter++
   }
 }
+
+/**
+ * Update article blocks
+ *
+ * @param articleId - Article ID
+ * @param blocks - Array of blocks to save
+ */
+export async function updateArticleBlocks(articleId: string, blocks: any[]) {
+  await prisma.article.update({
+    where: { id: articleId },
+    data: {
+      blocks: JSON.stringify(blocks),
+      updatedAt: new Date(),
+    },
+  })
+}
