@@ -1,0 +1,15 @@
+{
+  "extends": ["next/core-web-vitals", "next/typescript", "plugin:prettier/recommended"],
+  "rules": {
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "prettier/prettier": "error",
+    "react/prop-types": "off",
+    "react/react-in-jsx-scope": "off"
+  }
+}

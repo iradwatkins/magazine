@@ -1,0 +1,222 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ==============================================
+  # CI: Lint, Type-Check, and Build
+  # ==============================================
+  ci:
+    name: Continuous Integration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          NEXTAUTH_URL: http://localhost:3007
+          NEXTAUTH_SECRET: test-secret-for-ci
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: .next
+          retention-days: 1
+
+  # ==============================================
+  # Build and Push Docker Image
+  # ==============================================
+  build-image:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==============================================
+  # Deploy to Production VPS
+  # ==============================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+      url: https://magazine.stepperslife.com
+
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd /root/websites/magazine-stepperslife
+
+            # Pull latest changes
+            git pull origin main
+
+            # Pull latest Docker image
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker compose pull magazine-app
+
+            # Restart services
+            docker compose up -d magazine-app
+
+            # Run database migrations
+            docker compose exec -T magazine-app npx prisma migrate deploy
+
+            # Health check
+            sleep 10
+            curl -f http://localhost:3007/api/health || exit 1
+
+            echo "✅ Production deployment complete!"
+
+  # ==============================================
+  # Deploy Preview for Pull Requests
+  # ==============================================
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: github.event_name == 'pull_request'
+
+    environment:
+      name: preview-pr-${{ github.event.pull_request.number }}
+      url: https://magazine-pr-${{ github.event.pull_request.number }}.stepperslife.com
+
+    steps:
+      - name: Deploy Preview to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd /root/websites/magazine-stepperslife
+
+            # Create preview directory if it doesn't exist
+            mkdir -p previews/pr-${{ github.event.pull_request.number }}
+            cd previews/pr-${{ github.event.pull_request.number }}
+
+            # Clone repository and checkout PR branch
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/${{ github.repository }} .
+            fi
+            git fetch origin pull/${{ github.event.pull_request.number }}/head:pr-${{ github.event.pull_request.number }}
+            git checkout pr-${{ github.event.pull_request.number }}
+
+            # Calculate preview port (3100 + PR number)
+            PREVIEW_PORT=$((3100 + ${{ github.event.pull_request.number }}))
+
+            # Update environment file for preview
+            cp .env.example .env
+            sed -i "s|PORT=3007|PORT=$PREVIEW_PORT|g" .env
+            sed -i "s|magazine.stepperslife.com|magazine-pr-${{ github.event.pull_request.number }}.stepperslife.com|g" .env
+
+            # Start preview services with unique names
+            docker compose -p magazine-pr-${{ github.event.pull_request.number }} up -d
+
+            echo "✅ Preview deployed at https://magazine-pr-${{ github.event.pull_request.number }}.stepperslife.com"
+
+  # ==============================================
+  # Cleanup Closed PR Previews
+  # ==============================================
+  cleanup-preview:
+    name: Cleanup Preview
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+
+    steps:
+      - name: Cleanup Preview Environment
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd /root/websites/magazine-stepperslife/previews/pr-${{ github.event.pull_request.number }}
+
+            # Stop and remove preview containers
+            docker compose -p magazine-pr-${{ github.event.pull_request.number }} down -v
+
+            # Remove preview directory
+            cd ..
+            rm -rf pr-${{ github.event.pull_request.number }}
+
+            echo "✅ Preview environment cleaned up"
