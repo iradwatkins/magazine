@@ -37,10 +37,29 @@ export async function generateMetadata({
   }
 
   const displayName = category.charAt(0) + category.slice(1).toLowerCase()
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://magazine.stepperslife.com'
+  const title = `${displayName} Articles - SteppersLife Magazine`
+  const description = `Browse all ${displayName.toLowerCase()} articles on SteppersLife Magazine`
 
   return {
-    title: `${displayName} Articles - SteppersLife Magazine`,
-    description: `Browse all ${displayName.toLowerCase()} articles on SteppersLife Magazine`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${siteUrl}/category/${params.slug}`,
+      siteName: 'SteppersLife Magazine',
+      type: 'website',
+      locale: 'en_US',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+    },
+    alternates: {
+      canonical: `${siteUrl}/category/${params.slug}`,
+    },
   }
 }
 
@@ -73,7 +92,7 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
   return (
     <>
       <SiteHeader />
-      <main className="min-h-screen bg-background">
+      <main id="main-content" className="min-h-screen bg-background">
         {/* Category Header */}
         <section className="border-b bg-muted/30 py-12 lg:py-16">
           <div className="container mx-auto px-4">

@@ -62,7 +62,6 @@ export async function POST(
       message: 'Comment approved and flags cleared',
     })
   } catch (error) {
-    console.error('Error unflagging comment:', error)
     return NextResponse.json({ error: 'Failed to unflag comment' }, { status: 500 })
   }
 }

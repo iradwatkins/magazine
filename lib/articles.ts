@@ -5,6 +5,7 @@
 
 import { prisma } from './db'
 import { ArticleStatus, ArticleCategory, Prisma } from '@prisma/client'
+import { getCache, setCache, deleteCache, deleteCachePattern } from './redis'
 
 export interface CreateArticleInput {
   title: string
@@ -139,10 +140,18 @@ export async function getArticleById(id: string) {
 }
 
 /**
- * Get article by slug (without incrementing view count)
+ * Get article by slug (with Redis caching - Story 9.6)
  * Use this for metadata generation or preview
  */
 export async function getArticleBySlug(slug: string, incrementView: boolean = false) {
+  // Try to get from cache first (only for non-incrementing views)
+  if (!incrementView) {
+    const cached = await getCache<any>(`article:slug:${slug}`)
+    if (cached) {
+      return cached
+    }
+  }
+
   const article = await prisma.article.findUnique({
     where: { slug },
     include: {
@@ -164,6 +173,11 @@ export async function getArticleBySlug(slug: string, incrementView: boolean = fa
       },
     },
   })
+
+  // Cache published articles for 5 minutes
+  if (article && article.status === 'PUBLISHED' && !incrementView) {
+    await setCache(`article:slug:${slug}`, article, 300)
+  }
 
   // Optionally increment view count (only when rendering full page)
   if (article && incrementView) {
@@ -268,6 +282,9 @@ export async function listArticles(
  * Update article
  */
 export async function updateArticle(id: string, input: UpdateArticleInput) {
+  // Get current article to clear old cache
+  const currentArticle = await prisma.article.findUnique({ where: { id } })
+
   // If slug is being updated, check it doesn't conflict
   if (input.slug) {
     const existing = await prisma.article.findFirst({
@@ -297,6 +314,20 @@ export async function updateArticle(id: string, input: UpdateArticleInput) {
     },
   })
 
+  // Invalidate cache (Story 9.6)
+  if (currentArticle) {
+    await deleteCache(`article:slug:${currentArticle.slug}`)
+    await deleteCache(`article:id:${id}`)
+  }
+  // Also invalidate new slug if changed
+  if (input.slug && input.slug !== currentArticle?.slug) {
+    await deleteCache(`article:slug:${input.slug}`)
+  }
+  // Invalidate list caches
+  await deleteCachePattern('articles:list:*')
+  await deleteCachePattern('articles:category:*')
+  await deleteCachePattern('articles:tag:*')
+
   return article
 }
 
@@ -304,10 +335,22 @@ export async function updateArticle(id: string, input: UpdateArticleInput) {
  * Delete article
  */
 export async function deleteArticle(id: string) {
+  // Get article to clear cache
+  const article = await prisma.article.findUnique({ where: { id } })
+
   // This will cascade delete comments due to the schema
   await prisma.article.delete({
     where: { id },
   })
+
+  // Invalidate cache (Story 9.6)
+  if (article) {
+    await deleteCache(`article:slug:${article.slug}`)
+    await deleteCache(`article:id:${id}`)
+    await deleteCachePattern('articles:list:*')
+    await deleteCachePattern('articles:category:*')
+    await deleteCachePattern('articles:tag:*')
+  }
 }
 
 /**
@@ -438,13 +481,23 @@ export async function publishArticle(id: string) {
     throw new Error('Only approved articles can be published')
   }
 
-  return await prisma.article.update({
+  const result = await prisma.article.update({
     where: { id },
     data: {
       status: 'PUBLISHED',
       publishedAt: article.publishedAt || new Date(),
     },
   })
+
+  // Invalidate cache when publishing (Story 9.6)
+  await deleteCache(`article:slug:${article.slug}`)
+  await deleteCache(`article:id:${id}`)
+  await deleteCachePattern('articles:list:*')
+  await deleteCachePattern('articles:category:*')
+  await deleteCachePattern('articles:tag:*')
+  await deleteCachePattern('articles:related:*')
+
+  return result
 }
 
 /**
@@ -588,6 +641,13 @@ export async function getRelatedArticles(
   tags: string[],
   limit: number = 4
 ) {
+  // Try cache first (Story 9.6)
+  const cacheKey = `articles:related:${currentArticleId}:${limit}`
+  const cached = await getCache<any[]>(cacheKey)
+  if (cached) {
+    return cached
+  }
+
   // Get all published articles in same category (excluding current article)
   const candidates = await prisma.article.findMany({
     where: {
@@ -633,5 +693,86 @@ export async function getRelatedArticles(
   })
 
   // Return top N articles
-  return sorted.slice(0, limit)
+  const result = sorted.slice(0, limit)
+
+  // Cache for 10 minutes
+  await setCache(cacheKey, result, 600)
+
+  return result
+}
+
+/**
+ * Get recommended articles (Story 7.9)
+ * Algorithm:
+ * - Authenticated users: Articles from categories they've interacted with
+ * - Guests: Popular articles (by like count + view count)
+ * Returns 6 recommended articles
+ */
+export async function getRecommendedArticles(userId?: string | null, limit: number = 6) {
+  if (userId) {
+    // For authenticated users: Get articles from categories they've interacted with
+    const readArticles = await prisma.article.findMany({
+      where: {
+        status: 'PUBLISHED',
+        OR: [
+          { likes: { some: { userId } } },
+          { comments: { some: { userId } } },
+        ],
+      },
+      select: { category: true },
+      distinct: ['category'],
+      take: 5,
+    })
+
+    const interestedCategories = readArticles.map((a) => a.category)
+
+    if (interestedCategories.length > 0) {
+      // Get popular articles from those categories
+      return await prisma.article.findMany({
+        where: {
+          status: 'PUBLISHED',
+          category: { in: interestedCategories },
+        },
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          excerpt: true,
+          featuredImage: true,
+          category: true,
+          tags: true,
+          authorName: true,
+          authorPhoto: true,
+          publishedAt: true,
+          viewCount: true,
+          likeCount: true,
+        },
+        orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { publishedAt: 'desc' }],
+        take: limit,
+      })
+    }
+  }
+
+  // For guests or users with no history: Return popular articles
+  return await prisma.article.findMany({
+    where: {
+      status: 'PUBLISHED',
+    },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      excerpt: true,
+      featuredImage: true,
+      category: true,
+      tags: true,
+      authorName: true,
+      authorPhoto: true,
+      publishedAt: true,
+      viewCount: true,
+      likeCount: true,
+    },
+    orderBy: [{ likeCount: 'desc' }, { viewCount: 'desc' }, { publishedAt: 'desc' }],
+    take: limit,
+  })
 }

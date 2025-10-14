@@ -1,7 +1,14 @@
 'use client'
 
-import { SessionProvider as NextAuthSessionProvider } from 'next-auth/react'
+import { HybridSessionProvider } from '@/components/auth/hybrid-session-provider'
+import { ActivityProvider } from '@/components/debug/activity-provider'
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  return <NextAuthSessionProvider>{children}</NextAuthSessionProvider>
+  return (
+    <HybridSessionProvider>
+      <ActivityProvider>
+        {children}
+      </ActivityProvider>
+    </HybridSessionProvider>
+  )
 }

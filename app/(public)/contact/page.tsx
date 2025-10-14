@@ -66,7 +66,7 @@ export default function ContactPage() {
   return (
     <>
       <SiteHeader />
-      <main className="min-h-screen bg-background">
+      <main id="main-content" className="min-h-screen bg-background">
         {/* Page Header */}
         <section className="border-b bg-muted/30 py-12 lg:py-16">
           <div className="container mx-auto px-4">

@@ -161,7 +161,6 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       message: 'Article duplicated successfully',
     })
   } catch (error) {
-    console.error('Article duplication error:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to duplicate article' },
       { status: 500 }

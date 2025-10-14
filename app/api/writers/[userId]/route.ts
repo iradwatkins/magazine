@@ -44,7 +44,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       articles,
     })
   } catch (error) {
-    console.error('Error getting writer profile:', error)
     return NextResponse.json({ error: 'Failed to get writer profile' }, { status: 500 })
   }
 }
@@ -63,8 +62,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ user
     }
 
     // Check permissions - can only edit own profile unless admin
-    const userRoles = (session.user.roles || ['USER']) as UserRole[]
-    const isAdmin = userRoles.includes('ADMIN')
+    const userRole = ((session.user as any)?.role || 'USER') as UserRole
+    const isAdmin = userRole === 'ADMIN'
     const isSelf = session.user.id === userId
 
     if (!isSelf && !isAdmin) {
@@ -90,7 +89,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ user
       profile,
     })
   } catch (error) {
-    console.error('Error updating writer profile:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update writer profile' },
       { status: 500 }
@@ -115,8 +113,8 @@ export async function DELETE(
     }
 
     // Check permissions - can only delete own profile unless admin
-    const userRoles = (session.user.roles || ['USER']) as UserRole[]
-    const isAdmin = userRoles.includes('ADMIN')
+    const userRole = ((session.user as any)?.role || 'USER') as UserRole
+    const isAdmin = userRole === 'ADMIN'
     const isSelf = session.user.id === userId
 
     if (!isSelf && !isAdmin) {
@@ -129,7 +127,6 @@ export async function DELETE(
       message: 'Writer profile deleted successfully',
     })
   } catch (error) {
-    console.error('Error deleting writer profile:', error)
     return NextResponse.json({ error: 'Failed to delete writer profile' }, { status: 500 })
   }
 }

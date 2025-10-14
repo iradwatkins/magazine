@@ -15,17 +15,32 @@ import { prisma } from '@/lib/db'
  *
  * Returns dashboard statistics including:
  * - Total articles, published, drafts
- * - Total views
- * - Recent activity (last 10 articles)
- * - Popular articles (top 5 by views, last 30 days)
- * - Top contributors (top 5 by article count)
+ * - Total views and comments
+ * - Recent articles with images
+ * - User information
  */
 export async function GET() {
   try {
     const session = await auth()
 
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get user details
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        image: true
+      }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Get article counts by status
@@ -43,14 +58,25 @@ export async function GET() {
     })
     const totalViews = viewsResult._sum.viewCount || 0
 
-    // Get recent activity - last 10 articles (created, updated, or published)
-    const recentActivity = await prisma.article.findMany({
-      take: 10,
+    // Get total comments
+    const totalComments = await prisma.comment.count()
+
+    // Get recent articles based on user role
+    // ADMIN and MAGAZINE_EDITOR see all articles
+    // Others see only their own articles
+    const recentArticles = await prisma.article.findMany({
+      where: ['ADMIN', 'MAGAZINE_EDITOR'].includes(user.role)
+        ? {}
+        : { authorId: user.id },
       orderBy: { updatedAt: 'desc' },
+      take: 10,
       select: {
         id: true,
         title: true,
+        slug: true,
+        featuredImage: true,
         status: true,
+        viewCount: true,
         createdAt: true,
         updatedAt: true,
         publishedAt: true,
@@ -64,67 +90,31 @@ export async function GET() {
       },
     })
 
-    // Get popular articles - top 5 by view count (last 30 days)
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-    const popularArticles = await prisma.article.findMany({
-      take: 5,
-      where: {
-        status: 'PUBLISHED',
-        publishedAt: {
-          gte: thirtyDaysAgo,
-        },
-      },
-      orderBy: { viewCount: 'desc' },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        viewCount: true,
-        featuredImageUrl: true,
-        category: true,
-      },
-    })
-
-    // Get top contributors - top 5 authors by article count
-    const topContributors = await prisma.user.findMany({
-      take: 5,
-      where: {
-        articles: {
-          some: {},
-        },
-      },
-      select: {
-        id: true,
-        name: true,
-        image: true,
-        _count: {
-          select: {
-            articles: true,
-          },
-        },
-      },
-      orderBy: {
-        articles: {
-          _count: 'desc',
-        },
-      },
-    })
+    // Format articles - featuredImage already comes from the query
+    const formattedArticles = recentArticles.map(article => ({
+      ...article,
+      featuredImage: article.featuredImage || null
+    }))
 
     return NextResponse.json({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        image: user.image
+      },
       stats: {
         totalArticles,
         publishedArticles,
         draftArticles,
         totalViews,
+        totalComments,
       },
-      recentActivity,
-      popularArticles,
-      topContributors,
+      recentArticles: formattedArticles
     })
   } catch (error) {
-    console.error('Error fetching dashboard data:', error)
+    console.error('Dashboard API error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

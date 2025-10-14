@@ -102,7 +102,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(comment, { status: 201 })
   } catch (error) {
-    console.error('Error creating comment:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create comment' },
       { status: 500 }

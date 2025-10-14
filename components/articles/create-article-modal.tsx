@@ -124,8 +124,8 @@ export function CreateArticleModal({ open, onOpenChange }: CreateArticleModalPro
       // Close modal
       onOpenChange(false)
 
-      // Redirect to editor
-      router.push(`/editor/${articleId}`)
+      // Redirect to editor - use the article ID from the API response
+      router.push(`/editor/${data.id}`)
       router.refresh()
     } catch (error) {
       console.error('Failed to create article:', error)

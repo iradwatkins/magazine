@@ -31,7 +31,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ media })
   } catch (error) {
-    console.error('Error updating media:', error)
     return NextResponse.json({ error: 'Failed to update media' }, { status: 500 })
   }
 }
@@ -68,7 +67,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
         await minioClient.removeObject(BUCKET_NAME, thumbnailKey)
       }
     } catch (minioError) {
-      console.error('Error deleting from MinIO:', minioError)
       // Continue with database deletion even if MinIO fails
     }
 
@@ -79,7 +77,6 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting media:', error)
     return NextResponse.json({ error: 'Failed to delete media' }, { status: 500 })
   }
 }

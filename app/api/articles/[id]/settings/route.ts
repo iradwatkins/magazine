@@ -59,11 +59,18 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'Article not found' }, { status: 404 })
     }
 
-    // TODO: Check user has permission to edit this article
-    // For now, only allow the author to edit
-    // In production, also check if user has ADMIN role or MAGAZINE_WRITER permission
-    if (article.authorId !== session.user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    // Check user has permission to edit this article
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    })
+
+    const { ArticlePermissions } = await import('@/lib/rbac')
+    const userRoles = user?.role ? [user.role] : []
+    const canEdit = ArticlePermissions.canEdit(userRoles, article.authorId, session.user.id)
+
+    if (!canEdit) {
+      return NextResponse.json({ error: 'Forbidden - You do not have permission to edit this article' }, { status: 403 })
     }
 
     // Check if slug is unique (excluding current article)
@@ -113,7 +120,6 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       article: updatedArticle,
     })
   } catch (error) {
-    console.error('Article settings update error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

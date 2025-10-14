@@ -18,19 +18,31 @@ import {
 } from '@/components/ui/sheet'
 
 const categories = [
+  { name: 'News', slug: 'NEWS' },
+  { name: 'Events', slug: 'EVENTS' },
+  { name: 'Interviews', slug: 'INTERVIEWS' },
   { name: 'Lifestyle', slug: 'LIFESTYLE' },
-  { name: 'Entertainment', slug: 'ENTERTAINMENT' },
-  { name: 'Politics', slug: 'POLITICS' },
-  { name: 'Business', slug: 'BUSINESS' },
-  { name: 'Sports', slug: 'SPORTS' },
-  { name: 'Technology', slug: 'TECHNOLOGY' },
+  { name: 'Fashion', slug: 'FASHION' },
+  { name: 'Music', slug: 'MUSIC' },
+  { name: 'Community', slug: 'COMMUNITY' },
 ]
 
 export async function SiteHeader() {
   const session = await auth()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header
+      className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+      role="banner"
+      aria-label="Site header"
+    >
+      {/* Skip to main content link for keyboard navigation (Story 9.3) */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-gold focus:text-black focus:px-4 focus:py-2 focus:rounded-md focus:font-medium"
+      >
+        Skip to main content
+      </a>
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         {/* Logo/Brand */}
         <div className="flex items-center gap-6">
@@ -42,7 +54,7 @@ export async function SiteHeader() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-6" aria-label="Primary navigation">
             {categories.map((category) => (
               <Link
                 key={category.slug}
@@ -83,7 +95,7 @@ export async function SiteHeader() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/api/auth/signout">Sign Out</Link>
+                  <Link href="/sign-out">Sign Out</Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

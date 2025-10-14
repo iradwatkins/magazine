@@ -103,7 +103,6 @@ export async function POST(req: NextRequest, context: RouteContext) {
       })
     }
   } catch (error) {
-    console.error('Error toggling article like:', error)
     return NextResponse.json(
       { error: 'Failed to toggle like' },
       { status: 500 }

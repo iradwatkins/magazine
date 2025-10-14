@@ -12,16 +12,18 @@ import { getArticleById } from '@/lib/articles'
 import ArticleEditor from '@/components/editor/article-editor'
 
 interface EditorPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default async function EditorPage({ params }: EditorPageProps) {
+export default async function EditorPage({ params: paramsPromise }: EditorPageProps) {
   // Check authentication
   const session = await auth()
 
   if (!session?.user) {
     redirect('/sign-in')
   }
+
+  const params = await paramsPromise
 
   // Fetch article
   const article = await getArticleById(params.id)
@@ -30,13 +32,21 @@ export default async function EditorPage({ params }: EditorPageProps) {
     notFound()
   }
 
-  // TODO: Check permissions (user must be author or have EDIT_ANY_ARTICLE permission)
-  // For now, allow any authenticated user
-  // const userRole = (session.user as any)?.role || 'USER'
-  // const canEdit = article.authorId === session.user.id || userRole === 'ADMIN' || userRole === 'MAGAZINE_EDITOR'
-  // if (!canEdit) {
-  //   redirect('/articles')
-  // }
+  // Check permissions (user must be author or have EDIT_ANY_ARTICLE permission)
+  const { ArticlePermissions } = await import('@/lib/rbac')
+  const { prisma } = await import('@/lib/db')
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { role: true },
+  })
+
+  const userRoles = user?.role ? [user.role] : []
+  const canEdit = ArticlePermissions.canEdit(userRoles, article.authorId, session.user.id)
+
+  if (!canEdit) {
+    redirect('/articles')
+  }
 
   return <ArticleEditor article={article} />
 }

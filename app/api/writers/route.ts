@@ -32,7 +32,6 @@ export async function GET(req: NextRequest) {
     const result = await listWriterProfiles(page, limit)
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Error listing writers:', error)
     return NextResponse.json({ error: 'Failed to list writers' }, { status: 500 })
   }
 }

@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["relationJoins"]
@@ -14,33 +8,280 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================================
-// ENUMS
-// ============================================================================
+/// NextAuth.js Account model - OAuth/email provider accounts
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("Account")
+}
+
+/// NextAuth.js Session model
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("Session")
+}
+
+/// User model for NextAuth.js authentication
+model User {
+  id               String         @id @default(cuid())
+  name             String?
+  email            String?        @unique
+  emailVerified    DateTime?
+  image            String?
+  role             UserRole       @default(USER)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  accounts         Account[]
+  sessions         Session[]
+  articleLikes     ArticleLike[]
+  articles         Article[]      @relation("ArticleAuthor")
+  reviewedArticles Article[]      @relation("ArticleReviewer")
+  commentFlags     CommentFlag[]
+  deletedComments  Comment[]      @relation("DeletedComments")
+  comments         Comment[]      @relation("CommentAuthor")
+  uploadedMedia    Media[]        @relation("MediaUploadedBy")
+  writerProfile    WriterProfile? @relation("WriterProfile")
+
+  @@index([email])
+  @@map("User")
+}
+
+/// NextAuth.js verification token model
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("VerificationToken")
+}
+
+/// Magazine article
+model Article {
+  id              String          @id @default(cuid())
+  authorId        String
+  authorName      String
+  authorPhoto     String?
+  authorBio       String?
+  title           String
+  slug            String          @unique
+  subtitle        String?
+  content         String
+  excerpt         String?
+  featuredImage   String?
+  images          String[]
+  category        ArticleCategory
+  tags            String[]
+  metaTitle       String?
+  metaDescription String?
+  status          ArticleStatus
+  submittedAt     DateTime?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  publishedAt     DateTime?
+  isFeatured      Boolean         @default(false)
+  featuredUntil   DateTime?
+  viewCount       Int             @default(0)
+  likeCount       Int             @default(0)
+  shareCount      Int             @default(0)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  likes           ArticleLike[]
+  author          User            @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  reviewer        User?           @relation("ArticleReviewer", fields: [reviewedBy], references: [id])
+  comments        Comment[]
+
+  @@index([authorId])
+  @@index([reviewedBy])
+  @@index([status])
+  @@index([category])
+  @@index([publishedAt])
+  @@map("articles")
+}
+
+/// Article comment
+model Comment {
+  id            String        @id @default(cuid())
+  articleId     String
+  userId        String
+  userName      String
+  userPhoto     String?
+  content       String
+  parentId      String?
+  isApproved    Boolean       @default(true)
+  isFlagged     Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+  deletedBy     String?
+  flagCount     Int           @default(0)
+  flags         CommentFlag[]
+  article       Article       @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  deletedByUser User?         @relation("DeletedComments", fields: [deletedBy], references: [id])
+  parent        Comment?      @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       Comment[]     @relation("CommentReplies")
+  user          User          @relation("CommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@index([userId])
+  @@index([isFlagged])
+  @@index([deletedAt])
+  @@map("comments")
+}
+
+/// Comment flag/report
+model CommentFlag {
+  id        String   @id @default(cuid())
+  commentId String
+  userId    String
+  reason    String
+  details   String?
+  createdAt DateTime @default(now())
+  comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId])
+  @@index([commentId])
+  @@index([userId])
+  @@map("comment_flags")
+}
+
+/// Category management
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  color       String?
+  createdAt   DateTime @default(now())
+
+  @@map("categories")
+}
+
+/// Writer profile
+model WriterProfile {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  displayName   String
+  slug          String   @unique
+  bio           String?
+  photoUrl      String?
+  instagramUrl  String?
+  twitterUrl    String?
+  websiteUrl    String?
+  isApproved    Boolean  @default(false)
+  totalArticles Int      @default(0)
+  totalViews    Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation("WriterProfile", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("writer_profiles")
+}
+
+/// Media file
+model Media {
+  id           String   @id @default(cuid())
+  filename     String
+  originalName String
+  url          String
+  thumbnailUrl String?
+  mimeType     String
+  size         Int
+  width        Int?
+  height       Int?
+  alt          String?
+  caption      String?
+  credit       String?
+  bucketKey    String
+  uploadedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  uploadedBy   User     @relation("MediaUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  @@index([uploadedById])
+  @@index([mimeType])
+  @@index([createdAt])
+  @@map("media")
+}
+
+/// Article like
+model ArticleLike {
+  id        String   @id @default(cuid())
+  articleId String
+  userId    String
+  createdAt DateTime @default(now())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, userId])
+  @@index([articleId])
+  @@index([userId])
+  @@map("article_likes")
+}
+
+/// Debug log for tracking user actions and errors
+model DebugLog {
+  id        String   @id @default(cuid())
+  sessionId String
+  type      String   // 'action' | 'error' | 'api' | 'navigation' | 'auth'
+  level     String   // 'info' | 'warning' | 'error' | 'success'
+  category  String
+  message   String
+  details   String?  @db.Text
+  url       String?
+  userId    String?
+  ip        String?
+  userAgent String?
+  timestamp DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([type])
+  @@index([level])
+  @@index([userId])
+  @@index([timestamp])
+  @@map("debug_logs")
+}
 
 /// User roles in the SteppersLife ecosystem
 enum UserRole {
-  // Platform
   ADMIN
-
-  // Base
   USER
-
-  // Business Owners (self-assignable)
   STORE_OWNER
+  STORE_ADMIN
   RESTAURANT_OWNER
   EVENT_ORGANIZER
   INSTRUCTOR
   SERVICE_PROVIDER
   MAGAZINE_WRITER
-
-  // Assigned Roles
-  MAGAZINE_EDITOR
-  STORE_ADMIN
   RESTAURANT_MANAGER
   RESTAURANT_STAFF
   EVENT_STAFF
   AFFILIATE
+  MAGAZINE_EDITOR
 }
 
 /// Business types in the ecosystem
@@ -60,100 +301,14 @@ enum RoleAssignmentStatus {
   EXPIRED
 }
 
-// ============================================================================
-// USER & AUTHENTICATION (NextAuth.js)
-// ============================================================================
-
-/// NextAuth.js Account model - OAuth/email provider accounts
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@index([userId])
-  @@map("Account")
-}
-
-/// NextAuth.js Session model
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("Session")
-}
-
-/// User model for NextAuth.js authentication
-model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-
-  // NextAuth relations
-  accounts Account[]
-  sessions Session[]
-
-  // Role management (matches main database)
-  role UserRole @default(USER)
-
-  // Magazine relations (these tables exist separately)
-  articles         Article[]      @relation("ArticleAuthor")
-  reviewedArticles Article[]      @relation("ArticleReviewer")
-  comments         Comment[]      @relation("CommentAuthor")
-  writerProfile    WriterProfile? @relation("WriterProfile")
-  uploadedMedia    Media[]        @relation("MediaUploadedBy")
-  deletedComments  Comment[]      @relation("DeletedComments")
-  commentFlags     CommentFlag[]
-  articleLikes     ArticleLike[]
-
-  // Timestamps (match main database)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-  @@map("User")
-}
-
-/// NextAuth.js verification token model
-model VerificationToken {
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("VerificationToken")
-}
-
-// ============================================================================
-// MAGAZINE MODELS
-// ============================================================================
-
 /// Article status in review/publication workflow
 enum ArticleStatus {
-  DRAFT // Writer is still editing
-  SUBMITTED // Submitted for review
-  APPROVED // Approved, ready to publish
-  PUBLISHED // Live on site
-  REJECTED // Not approved
-  ARCHIVED // Removed from public view
+  DRAFT
+  SUBMITTED
+  APPROVED
+  PUBLISHED
+  REJECTED
+  ARCHIVED
 }
 
 /// Article category
@@ -168,234 +323,4 @@ enum ArticleCategory {
   MUSIC
   COMMUNITY
   OTHER
-}
-
-/// Magazine article
-model Article {
-  id String @id @default(cuid())
-
-  // Author (using NextAuth User)
-  authorId    String
-  author      User    @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Cascade)
-  authorName  String
-  authorPhoto String?
-  authorBio   String?
-
-  // Article content
-  title    String
-  slug     String  @unique
-  subtitle String?
-  content  String  @db.Text // Rich text JSON or HTML
-  excerpt  String? // Short summary
-
-  // Media
-  featuredImage String?
-  images        String[] // Additional images in article
-
-  // Categorization
-  category ArticleCategory
-  tags     String[]
-
-  // SEO
-  metaTitle       String?
-  metaDescription String?
-
-  // Publishing
-  status ArticleStatus
-
-  // Review
-  submittedAt DateTime?
-  reviewedBy  String? // Admin user ID
-  reviewer    User?     @relation("ArticleReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
-  reviewedAt  DateTime?
-  reviewNotes String? // Feedback from admin
-
-  publishedAt DateTime?
-
-  // Featured
-  isFeatured    Boolean   @default(false)
-  featuredUntil DateTime?
-
-  // Stats
-  viewCount  Int @default(0)
-  likeCount  Int @default(0)
-  shareCount Int @default(0)
-
-  // Comments
-  comments Comment[]
-
-  // Likes
-  likes ArticleLike[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([authorId])
-  @@index([reviewedBy])
-  @@index([status])
-  @@index([category])
-  @@index([publishedAt])
-  @@map("articles")
-}
-
-/// Article comment
-model Comment {
-  id        String  @id @default(cuid())
-  articleId String
-  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-
-  // Commenter (using NextAuth)
-  userId    String
-  user      User    @relation("CommentAuthor", fields: [userId], references: [id], onDelete: Cascade)
-  userName  String
-  userPhoto String?
-
-  // Comment content
-  content String
-
-  // Replies (threaded comments)
-  parentId String?
-  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies  Comment[] @relation("CommentReplies")
-
-  // Moderation
-  isApproved Boolean @default(true)
-  isFlagged  Boolean @default(false)
-  flagCount  Int     @default(0)
-
-  // Soft delete tracking
-  deletedAt DateTime?
-  deletedBy String?
-  deletedByUser User? @relation("DeletedComments", fields: [deletedBy], references: [id])
-
-  // Relations
-  flags CommentFlag[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([articleId])
-  @@index([userId])
-  @@index([isFlagged])
-  @@index([deletedAt])
-  @@map("comments")
-}
-
-/// Comment flag/report
-model CommentFlag {
-  id        String @id @default(cuid())
-  commentId String
-  userId    String
-  reason    String // "spam", "harassment", "inappropriate", "off-topic", "other"
-  details   String? // Optional additional details
-
-  createdAt DateTime @default(now())
-
-  comment Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([commentId, userId]) // One flag per user per comment
-  @@index([commentId])
-  @@index([userId])
-  @@map("comment_flags")
-}
-
-/// Category management
-model Category {
-  id          String  @id @default(cuid())
-  name        String  @unique
-  slug        String  @unique
-  description String?
-  color       String? // Hex color for category badge
-
-  createdAt DateTime @default(now())
-
-  @@map("categories")
-}
-
-/// Writer profile
-model WriterProfile {
-  id String @id @default(cuid())
-
-  // Writer (using NextAuth)
-  userId String @unique
-  user   User   @relation("WriterProfile", fields: [userId], references: [id], onDelete: Cascade)
-
-  // Profile
-  displayName String
-  slug        String  @unique
-  bio         String?
-  photoUrl    String?
-
-  // Social
-  instagramUrl String?
-  twitterUrl   String?
-  websiteUrl   String?
-
-  // Status
-  isApproved Boolean @default(false)
-
-  // Stats
-  totalArticles Int @default(0)
-  totalViews    Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@map("writer_profiles")
-}
-
-/// Media file
-model Media {
-  id String @id @default(cuid())
-
-  // File information
-  filename     String
-  originalName String
-  url          String
-  thumbnailUrl String?
-  mimeType     String
-  size         Int // Size in bytes
-
-  // Image dimensions
-  width  Int?
-  height Int?
-
-  // Metadata
-  alt     String?
-  caption String?
-  credit  String?
-
-  // Storage
-  bucketKey String // MinIO object key
-
-  // Uploader
-  uploadedById String
-  uploadedBy   User   @relation("MediaUploadedBy", fields: [uploadedById], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([uploadedById])
-  @@index([mimeType])
-  @@index([createdAt])
-  @@map("media")
-}
-
-/// Article like
-model ArticleLike {
-  id        String   @id @default(cuid())
-  articleId String
-  userId    String
-
-  createdAt DateTime @default(now())
-
-  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([articleId, userId]) // One like per user per article
-  @@index([articleId])
-  @@index([userId])
-  @@map("article_likes")
 }

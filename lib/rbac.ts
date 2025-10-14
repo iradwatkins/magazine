@@ -258,3 +258,28 @@ export function requireMinimumRole(userRoles: UserRole[], minimumRole: UserRole)
     throw new AuthorizationError(`This action requires at least ${minimumRole} role`)
   }
 }
+
+/**
+ * Check if a user has permission (async version that fetches from database)
+ * @param userId - The user ID to check
+ * @param requiredRole - The minimum role required
+ * @returns Promise<boolean> - True if user has the required role or higher
+ */
+export async function hasPermission(userId: string, requiredRole: UserRole): Promise<boolean> {
+  const { prisma } = await import('./db')
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      role: true,
+    },
+  })
+
+  if (!user) {
+    return false
+  }
+
+  // Check if user has the required role using hierarchy
+  const userRoles: UserRole[] = [user.role]
+  return hasMinimumRole(userRoles, requiredRole)
+}

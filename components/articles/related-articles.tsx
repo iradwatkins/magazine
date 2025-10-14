@@ -10,6 +10,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -51,11 +52,13 @@ export function RelatedArticles({ articles }: RelatedArticlesProps) {
           >
             {/* Featured Image */}
             {article.featuredImage && (
-              <div className="aspect-video overflow-hidden">
-                <img
+              <div className="aspect-video overflow-hidden relative">
+                <Image
                   src={article.featuredImage}
                   alt={article.title}
-                  className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                  fill
+                  className="object-cover transition-transform group-hover:scale-105"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                   loading="lazy"
                 />
               </div>
@@ -81,11 +84,15 @@ export function RelatedArticles({ articles }: RelatedArticlesProps) {
               {/* Author and Meta */}
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {article.authorPhoto && (
-                  <img
-                    src={article.authorPhoto}
-                    alt={article.authorName}
-                    className="h-6 w-6 rounded-full object-cover"
-                  />
+                  <div className="relative h-6 w-6 flex-shrink-0">
+                    <Image
+                      src={article.authorPhoto}
+                      alt={article.authorName}
+                      fill
+                      className="rounded-full object-cover"
+                      sizes="24px"
+                    />
+                  </div>
                 )}
                 <span className="font-medium">{article.authorName}</span>
                 {article.publishedAt && (

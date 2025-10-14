@@ -87,7 +87,6 @@ export async function GET(request: Request) {
       limit,
     })
   } catch (_error) {
-    console.error('Error fetching media:', _error)
     return NextResponse.json({ error: 'Failed to fetch media' }, { status: 500 })
   }
 }

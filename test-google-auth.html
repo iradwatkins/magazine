@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Google OAuth Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .button {
+            background-color: #4285f4;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .button:hover {
+            background-color: #357ae8;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        pre {
+            background-color: #f4f4f4;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>SteppersLife Magazine - Google OAuth Test</h1>
+
+    <div id="status" class="status info">Ready to test authentication</div>
+
+    <h2>Test Steps:</h2>
+    <ol>
+        <li>Click "Test Auth Providers" to verify endpoints</li>
+        <li>Click "Sign In with Google" to test OAuth flow</li>
+        <li>Click "Test Sign In Page" to go to the actual sign-in page</li>
+    </ol>
+
+    <div>
+        <button class="button" onclick="testProviders()">Test Auth Providers</button>
+        <button class="button" onclick="signInWithGoogle()">Sign In with Google</button>
+        <button class="button" onclick="testSignInPage()">Test Sign In Page</button>
+    </div>
+
+    <h3>Response:</h3>
+    <pre id="response">No response yet</pre>
+
+    <script>
+        const BASE_URL = 'https://magazine.stepperslife.com';
+
+        async function testProviders() {
+            const status = document.getElementById('status');
+            const response = document.getElementById('response');
+
+            status.className = 'status info';
+            status.textContent = 'Testing auth providers...';
+
+            try {
+                const res = await fetch(`${BASE_URL}/api/auth/providers`);
+                const data = await res.json();
+
+                status.className = 'status success';
+                status.textContent = 'Auth providers retrieved successfully!';
+                response.textContent = JSON.stringify(data, null, 2);
+
+                // Check if Google provider exists
+                if (data.google) {
+                    response.textContent += '\n\n✅ Google OAuth is configured!';
+                    response.textContent += '\n\nGoogle Sign-In URL: ' + data.google.signinUrl;
+                    response.textContent += '\nGoogle Callback URL: ' + data.google.callbackUrl;
+                } else {
+                    response.textContent += '\n\n❌ Google OAuth provider not found!';
+                }
+
+            } catch (error) {
+                status.className = 'status error';
+                status.textContent = 'Error testing providers: ' + error.message;
+                response.textContent = error.stack;
+            }
+        }
+
+        function signInWithGoogle() {
+            const status = document.getElementById('status');
+            status.className = 'status info';
+            status.textContent = 'Redirecting to Google OAuth...';
+
+            // This will redirect to Google OAuth
+            window.location.href = `${BASE_URL}/api/auth/signin/google?callbackUrl=${BASE_URL}/dashboard`;
+        }
+
+        function testSignInPage() {
+            const status = document.getElementById('status');
+            status.className = 'status info';
+            status.textContent = 'Redirecting to sign-in page...';
+
+            window.location.href = `${BASE_URL}/sign-in?callbackUrl=/dashboard`;
+        }
+
+        // Auto-test providers on load
+        window.onload = () => {
+            testProviders();
+        };
+    </script>
+
+    <hr>
+    <h3>Manual Testing:</h3>
+    <p>If the buttons above don't work, try these direct links:</p>
+    <ul>
+        <li><a href="https://magazine.stepperslife.com/api/auth/providers" target="_blank">Check Auth Providers</a></li>
+        <li><a href="https://magazine.stepperslife.com/api/auth/signin/google?callbackUrl=https://magazine.stepperslife.com/dashboard" target="_blank">Direct Google OAuth Link</a></li>
+        <li><a href="https://magazine.stepperslife.com/sign-in" target="_blank">Sign In Page</a></li>
+    </ul>
+
+    <h3>Expected Google Cloud Console Settings:</h3>
+    <pre>
+Authorized JavaScript origins:
+- https://magazine.stepperslife.com
+
+Authorized redirect URIs:
+- https://magazine.stepperslife.com/api/auth/callback/google
+    </pre>
+</body>
+</html>

@@ -2,19 +2,20 @@ import Link from 'next/link'
 import { Facebook, Twitter, Instagram, Linkedin } from 'lucide-react'
 
 const categories = [
+  { name: 'News', slug: 'news' },
+  { name: 'Events', slug: 'events' },
+  { name: 'Interviews', slug: 'interviews' },
   { name: 'Lifestyle', slug: 'lifestyle' },
-  { name: 'Entertainment', slug: 'entertainment' },
-  { name: 'Politics', slug: 'politics' },
-  { name: 'Business', slug: 'business' },
-  { name: 'Sports', slug: 'sports' },
-  { name: 'Technology', slug: 'technology' },
+  { name: 'Fashion', slug: 'fashion' },
+  { name: 'Music', slug: 'music' },
+  { name: 'Community', slug: 'community' },
 ]
 
 export function SiteFooter() {
   const currentYear = new Date().getFullYear()
 
   return (
-    <footer className="border-t bg-muted/40">
+    <footer className="border-t bg-muted/40" role="contentinfo" aria-label="Site footer">
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}

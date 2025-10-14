@@ -40,7 +40,11 @@ export function ArticleCard({ article }: ArticleCardProps) {
 
   return (
     <Card className="group h-full overflow-hidden transition-all hover:shadow-lg">
-      <Link href={`/articles/${article.slug}`} className="block">
+      <Link
+        href={`/articles/${article.slug}`}
+        className="block"
+        aria-label={`Read article: ${article.title}`}
+      >
         {/* Thumbnail */}
         <div className="relative aspect-[16/9] w-full overflow-hidden bg-muted">
           {article.featuredImage ? (
@@ -98,12 +102,12 @@ export function ArticleCard({ article }: ArticleCardProps) {
         {/* Stats Footer */}
         <CardFooter className="border-t pt-4">
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <Eye className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-1.5" aria-label={`${article.viewCount} views`}>
+              <Eye className="h-3.5 w-3.5" aria-hidden="true" />
               <span>{article.viewCount.toLocaleString()}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <Heart className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-1.5" aria-label={`${article.likeCount} likes`}>
+              <Heart className="h-3.5 w-3.5" aria-hidden="true" />
               <span>{article.likeCount.toLocaleString()}</span>
             </div>
           </div>

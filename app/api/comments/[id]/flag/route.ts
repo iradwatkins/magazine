@@ -96,7 +96,6 @@ export async function POST(
       message: 'Comment flagged successfully',
     })
   } catch (error) {
-    console.error('Error flagging comment:', error)
     return NextResponse.json({ error: 'Failed to flag comment' }, { status: 500 })
   }
 }

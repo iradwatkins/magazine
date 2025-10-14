@@ -6,6 +6,28 @@ import { SiteFooter } from '@/components/layout/site-footer'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import type { Metadata } from 'next'
+
+export const metadata: Metadata = {
+  title: 'SteppersLife Magazine - Premier Digital Magazine for Stepping Culture',
+  description:
+    'Your premier digital magazine covering stepping culture, lifestyle, fashion, music, events, and community stories.',
+  openGraph: {
+    title: 'SteppersLife Magazine',
+    description:
+      'Your premier digital magazine covering stepping culture, lifestyle, fashion, music, events, and community stories.',
+    url: 'https://magazine.stepperslife.com',
+    siteName: 'SteppersLife Magazine',
+    type: 'website',
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'SteppersLife Magazine',
+    description:
+      'Your premier digital magazine covering stepping culture, lifestyle, fashion, music, events, and community stories.',
+  },
+}
 
 export default async function HomePage() {
   // Fetch published articles
@@ -26,6 +48,39 @@ export default async function HomePage() {
 
   const [featuredArticle, ...latestArticles] = articles
 
+  // Generate JSON-LD structured data for homepage (Story 9.8)
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://magazine.stepperslife.com'
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'SteppersLife Magazine',
+    url: siteUrl,
+    description:
+      'Your premier digital magazine covering stepping culture, lifestyle, fashion, music, events, and community stories.',
+    publisher: {
+      '@type': 'Organization',
+      name: 'SteppersLife Magazine',
+      url: siteUrl,
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/logo.png`,
+      },
+      sameAs: [
+        'https://facebook.com/stepperslife',
+        'https://twitter.com/stepperslife',
+        'https://instagram.com/stepperslife',
+      ],
+    },
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${siteUrl}/articles?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  }
+
   // Group articles by category for category sections
   const articlesByCategory = latestArticles.reduce((acc, article) => {
     const category = article.category
@@ -41,7 +96,12 @@ export default async function HomePage() {
   return (
     <>
       <SiteHeader />
-      <main className="min-h-screen bg-background">
+      <main id="main-content" className="min-h-screen bg-background">
+        {/* JSON-LD Structured Data for SEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
       {/* Hero/Featured Article Section */}
       {featuredArticle ? (
         <FeaturedArticle article={featuredArticle} />

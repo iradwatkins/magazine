@@ -46,7 +46,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(result)
   } catch (error) {
-    console.error('Error listing articles:', error)
     return NextResponse.json({ error: 'Failed to list articles' }, { status: 500 })
   }
 }
@@ -63,14 +62,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // SSO provides single role, convert to array for RBAC functions
-    const userRole = (session.user as any)?.role || 'USER'
-    const userRoles = [userRole] as UserRole[]
+    // Rate limiting - 10 articles per hour per user
+    const { rateLimit, getClientIdentifier, RATE_LIMITS } = await import('@/lib/rate-limit')
+    const identifier = getClientIdentifier(req, session.user.id)
+    const rateLimitResult = await rateLimit(identifier, RATE_LIMITS.ARTICLE_CREATE)
+
+    if (!rateLimitResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded. Please try again later.',
+          limit: rateLimitResult.limit,
+          remaining: rateLimitResult.remaining,
+          reset: rateLimitResult.reset,
+        },
+        {
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': rateLimitResult.limit.toString(),
+            'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
+            'X-RateLimit-Reset': new Date(rateLimitResult.reset).toISOString(),
+          },
+        }
+      )
+    }
+
+    // Get user role from session (single role, not array)
+    const userRole = ((session.user as any)?.role || 'USER') as UserRole
 
     // Check if user has writer permissions
-    const hasWriterPermission = userRoles.some((role) =>
-      ['MAGAZINE_WRITER', 'MAGAZINE_EDITOR', 'ADMIN'].includes(role)
-    )
+    const hasWriterPermission = ['MAGAZINE_WRITER', 'MAGAZINE_EDITOR', 'ADMIN'].includes(userRole)
 
     if (!hasWriterPermission) {
       return NextResponse.json(
@@ -124,7 +144,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ message: 'Article created successfully', article }, { status: 201 })
   } catch (error) {
-    console.error('Error creating article:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to create article' },
       { status: 500 }

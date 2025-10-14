@@ -99,6 +99,16 @@
   a {
     @apply text-primary underline-offset-4 hover:underline;
   }
+
+  /* Accessibility: Enhanced focus indicators (Story 9.3) */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-gold ring-offset-2 ring-offset-background;
+  }
+
+  /* Skip to content link */
+  .skip-to-content:focus {
+    @apply not-sr-only absolute top-4 left-4 z-50 bg-gold text-black px-4 py-2 rounded-md font-medium;
+  }
 }
 
 @layer components {

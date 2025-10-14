@@ -30,9 +30,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
     }
 
-    // TODO: Check user permissions
-    // For now, we'll allow authenticated users to perform bulk actions
-    // In production, you should check if user has permission to modify these articles
+    // Check user permissions - only editors and admins can perform bulk actions
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    })
+
+    const userRole = user?.role || 'USER'
+    const canPerformBulkActions = ['MAGAZINE_EDITOR', 'ADMIN'].includes(userRole)
+
+    if (!canPerformBulkActions) {
+      return NextResponse.json(
+        { error: 'You need editor permissions to perform bulk actions' },
+        { status: 403 }
+      )
+    }
 
     let result: any
 
@@ -93,7 +105,6 @@ export async function POST(req: NextRequest) {
       message: `${result.count} article(s) ${action === 'change-category' ? 'updated' : action}ed successfully`,
     })
   } catch (error) {
-    console.error('Bulk operation error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

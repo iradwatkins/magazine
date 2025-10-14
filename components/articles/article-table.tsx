@@ -262,7 +262,7 @@ export function ArticleTable({
                       onSave={(newValue) => updateArticleField(article.id, 'title', newValue)}
                       renderDisplay={(value) => (
                         <Link
-                          href={`/editor/${articleId}`}
+                          href={`/editor/${article.id}`}
                           className="font-medium hover:underline"
                           onClick={(e) => {
                             if (editingCell === `${article.id}-title`) {

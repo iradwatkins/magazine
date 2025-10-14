@@ -23,7 +23,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       article,
     })
   } catch (error) {
-    console.error('Error submitting article:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to submit article' },
       { status: 400 }

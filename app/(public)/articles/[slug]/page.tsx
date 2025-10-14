@@ -27,6 +27,7 @@ import { CommentsList } from '@/components/articles/comments-list'
 import { LikeButton } from '@/components/articles/like-button'
 import { ShareButtons } from '@/components/articles/share-buttons'
 import { RelatedArticles } from '@/components/articles/related-articles'
+import { ReadingProgressBar } from '@/components/articles/reading-progress-bar'
 import { prisma } from '@/lib/db'
 
 interface ArticlePageProps {
@@ -172,10 +173,74 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
 
   const readTime = Math.max(1, Math.ceil(wordCount / 200))
 
+  // Generate JSON-LD structured data for SEO (Story 9.8)
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://magazine.stepperslife.com'
+  const articleUrl = `${siteUrl}/articles/${article.slug}`
+  const imageUrl = article.featuredImage?.startsWith('http')
+    ? article.featuredImage
+    : `${siteUrl}${article.featuredImage}`
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: article.title,
+    description: article.excerpt || article.subtitle || '',
+    image: article.featuredImage ? [imageUrl] : [],
+    datePublished: article.publishedAt?.toISOString(),
+    dateModified: article.updatedAt.toISOString(),
+    author: {
+      '@type': 'Person',
+      name: article.authorName,
+      ...(article.authorPhoto && {
+        image: article.authorPhoto.startsWith('http')
+          ? article.authorPhoto
+          : `${siteUrl}${article.authorPhoto}`,
+      }),
+      ...(article.authorBio && { description: article.authorBio }),
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'SteppersLife Magazine',
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/logo.png`,
+      },
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': articleUrl,
+    },
+    articleSection: article.category,
+    keywords: article.tags.join(', '),
+    wordCount: wordCount,
+    ...(article.tags.length > 0 && { keywords: article.tags }),
+    interactionStatistic: [
+      {
+        '@type': 'InteractionCounter',
+        interactionType: 'https://schema.org/LikeAction',
+        userInteractionCount: article.likeCount,
+      },
+      {
+        '@type': 'InteractionCounter',
+        interactionType: 'https://schema.org/ViewAction',
+        userInteractionCount: article.viewCount,
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-background">
+      {/* JSON-LD Structured Data for SEO */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+
+      {/* Reading Progress Bar (Story 7.8) */}
+      <ReadingProgressBar />
+
       {/* Article Container */}
-      <article className="container mx-auto max-w-4xl px-4 py-8 lg:py-12">
+      <article id="main-content" className="container mx-auto max-w-4xl px-4 py-8 lg:py-12">
         {/* Breadcrumb Navigation */}
         <nav className="mb-6 text-sm text-muted-foreground">
           <Link href="/" className="hover:text-foreground">

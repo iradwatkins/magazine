@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession, handleAuthError } from '@/lib/auth-middleware'
+import { getSession } from '@/lib/auth-middleware'
 import { ArticlePermissions } from '@/lib/rbac'
 import { getArticleById, updateArticle, deleteArticle } from '@/lib/articles'
 import { UserRole } from '@prisma/client'
@@ -44,7 +44,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     return NextResponse.json({ article })
   } catch (error) {
-    console.error('Error getting article:', error)
     return NextResponse.json({ error: 'Failed to get article' }, { status: 500 })
   }
 }
@@ -100,7 +99,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       article: updatedArticle,
     })
   } catch (error) {
-    console.error('Error updating article:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update article' },
       { status: 500 }
@@ -174,7 +172,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       article: updatedArticle,
     })
   } catch (error) {
-    console.error('Error updating article:', error)
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Failed to update article' },
       { status: 500 }
@@ -220,7 +217,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       message: 'Article deleted successfully',
     })
   } catch (error) {
-    console.error('Error deleting article:', error)
     return NextResponse.json({ error: 'Failed to delete article' }, { status: 500 })
   }
 }
